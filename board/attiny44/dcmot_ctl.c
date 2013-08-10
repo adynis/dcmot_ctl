@@ -1,6 +1,6 @@
 
 /*
-  __AVR_ATtiny84__
+  __AVR_ATtiny44__
   /usr/lib/avr/include/avr/io.h     
   /usr/lib/avr/include/avr/iotn84.h
   /usr/lib/avr/include/avr/iotnx4.h
@@ -10,6 +10,7 @@
 #include <avr/io.h>
 #include <util/delay.h>
 #include <avr/interrupt.h> 
+#include <avr/wdt.h>
 #include "usi_twi_slave.h"
 
 
@@ -799,26 +800,24 @@ void delay_milli_seconds(uint8_t x)
   _delay_loop_2( (uint16_t)((unsigned long)x*(unsigned long)(F_CPU/4000UL)) );
 }
 
-
-
-
-int main(void)
+void init(void)
 {
-  uint8_t p, i;
-  uint16_t adc;
-
+  wdt_disable();
+  
   /* setup system clock */
   setup_system_clock();
 
-  /* all input, disable pull up, should be also default be reset */
+  /* all input, disable pull up except for sync input, should be also default be reset */
   DDRA = 0;
-  PORTA = 0;
+  PORTA = 128;		/* sync input */
   DDRB = 0;
   PORTB = 0;
   
   /* the two control pins for the SI9986 */
   DDRB |= 3;
 
+  /* set INA and INB of the SI9986 to zero */
+  PORTB &= ~3;	/* set pwm output */
   
   usi_memory[SPEED] = 10;
   usi_memory[REVERSE] = 0;
@@ -834,14 +833,21 @@ int main(void)
   
   usiTwiSlaveInit();	
   
-  setup_timer1_interrupt();
+  setup_timer1_interrupt();  
   
-  
+  wdt_enable(WDTO_250MS);
+}
+
+void loop(uint8_t is_from_watchdog)
+{
   for(;;)
   {
     DDRA |= 1<<5;
     PORTA |= 1<<5;
+    _delay_loop_2((1+is_from_watchdog)*(F_CPU/4000)); 	/* 4*arg = ms/1000 * F_CPU; arg = ms * F_CPU / 4000 */
     PORTA &= ~(1<<5);
+    _delay_loop_2(1*(F_CPU/4000)); 	/* 4*arg = ms/1000 * F_CPU; arg = ms * F_CPU / 4000 */
+    wdt_reset();
     
     //p = USI_Slave_register_buffer[0];
     /*
@@ -858,6 +864,22 @@ int main(void)
     }
     */
   }
+}
+
+
+ISR(SIG_WATCHDOG_TIMEOUT)
+{
+  init();
+  loop(1);
+  
+}
+
+/* reset enty */
+int main(void)
+{
+  init();
+  loop(0);
+  
   return 0;
 }
 
