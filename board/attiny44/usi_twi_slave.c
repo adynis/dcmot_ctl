@@ -211,7 +211,7 @@ volatile uint8_t usi_mem_adr = 0; 					// Virtual buffer address register
 
 //############################################ initialize USI for TWI slave mode
 
-void usiTwiSlaveInit(void)
+void usi_twi_slave_init(void)
 {
 	// In Two Wire mode (USIWM1, USIWM0 = 1X), the slave USI will pull SCL
 	// low when a start condition is detected or a counter overflow (only
@@ -278,7 +278,7 @@ ISR(USI_OVERFLOW_VECTOR)	// Handles all the communication. Only disabled when wa
   if (USISR & _BV(USIPF)) 
   {
     // stop conditions detected 
-    usiTwiSlaveInit();
+    usi_twi_slave_init();
   }
   else 
   {

@@ -127,10 +127,10 @@ void info(void)
   line("measure 1.1V ref", 5);
   line("speed with rpm control", 6);
   line("max speed with rpm control", 7);
-  line("adc low pwm val", 8);
-  line("measure cnt", 9);
-  line("measure average", 10);
-  line("dc motor present (1=yes)", 11);
+  line("adc low pwm val", 10);
+  line("measure cnt", 11);
+  line("measure average", 12);
+  line("dc motor present (1=yes)", 13);
   //line("Back-EMF", 12);
   
   Serial.print("BEMF: ");

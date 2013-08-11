@@ -5,6 +5,23 @@
   /usr/lib/avr/include/avr/iotn84.h
   /usr/lib/avr/include/avr/iotnx4.h
   /usr/lib/avr/include/util/delay.h
+  
+  
+  PORT A0	BEMF Measure, OUTA
+  PORT A1	Analog reference for delta BEMF Measure
+  PORT A2	BEMF Measure, OUTB
+  PORT A3	MOSFET 0 (GATE_SW1)
+  PORT A4	SCK (ISP)/SCL
+  PORT A5	MISO (ISP)/Analog input from DIP switch (I2C address)/emergency signal: high pwm if in WDT interrupt
+  PORT A6	MOSI (ISP)/SDA
+  PORT A7	SYNC Input
+  
+  PORT B0	Si9986 INA
+  PORT B1	Si9986 INB
+  PORT B2	MOSFET 1 (GATE_SW2)
+  PORT B3	Reset (ISP)
+  
+  
 */
 
 #include <avr/io.h>
@@ -63,16 +80,20 @@
 #define SPEED_CTL_MAX 7
 
 
+#define MOSFET_ENABLE_0 8
+#define MOSFET_ENABLE_1 9
+
+
 /* 
   OUTPUT: Measured voltage during low part of the PWM signal (in PWM - Back-EMF) 
   affected by:  MEASURE_CTL, MEASURE_REF, SPEED
   range: 0..255
   note: SPEED must be low (depends on constant, but if SPEED is below 70, then this measure is taken)
 */
-#define ADC_PWM_LOW_VAL 8
+#define ADC_PWM_LOW_VAL 10
 
 /* OUTPUT: Number of measures taken, this is 4*usi_memory[MEASURE_TICKS].  */
-#define ADC_MEASURE_CNT 9
+#define ADC_MEASURE_CNT 11
 
 /* 
   OUTPUT: Average value of the measures taken in the measure cycle or 255 if measure is not done
@@ -80,7 +101,7 @@
   range: 0..255
   note: This value is not present (==255) if MEASURE_TICKS == 0
 */
-#define ADC_MEASURE_AVERAGE 10
+#define ADC_MEASURE_AVERAGE 12
 
 /*
   OUTPUT: Is dc motor present? 
@@ -89,7 +110,7 @@
   Note: Usefull value is only given for SPEED >= 8 
   Note: Not available for DRIVE_TICKS==1 and MEASURE_TICKS != 0
 */
-#define IS_PRESENT 11
+#define IS_PRESENT 13
 
 
 
@@ -146,6 +167,124 @@ static inline void dm_pwm_low(void)
   PORTB &= ~3;	/* set pwm output */
 }
 
+
+/*========================================================================*/
+/* mosfet pulse */ 
+/*========================================================================*/
+
+/* duration of the mosfet pulse in timer 1 ticks (488Hz) */
+#define MOSFET_PULSE_TIME 122
+
+#define MOSFET_STATE_IDLE 0
+#define MOSFET_STATE_ON 1
+#define MOSFET_STATE_OFF 2
+
+
+
+struct mosfet_data_struct
+{
+  uint8_t pulse_time_cnt;
+  uint8_t pulse_off_cnt;
+  uint8_t last_value_from_usi_memory;
+  uint8_t state;
+};
+
+struct mosfet_data_struct mosfet_data[2];
+
+/*
+  PORT A3	MOSFET 0 (GATE_SW1)
+  PORT B2	MOSFET 1 (GATE_SW2)
+*/
+void enable_mosfet(uint8_t nr)
+{
+  if ( nr == 0 )
+  {
+    cli();        // disable interrupts
+    DDRA |= 1<<3;
+    PORTA |= 1<<3;
+    sei();        // enable interrupts
+  }
+  else if ( nr == 1 )
+  {
+    cli();        // disable interrupts
+    DDRB |= 1<<2;
+    PORTB |= 1<<2;
+    sei();        // enable interrupts
+  }
+  else
+  {
+      /* maybe force WDT */
+  }    
+}
+
+void disable_mosfet(uint8_t nr)
+{
+  if ( nr == 0 )
+  {
+    cli();        // disable interrupts
+    DDRA |= 1<<3;
+    PORTA &= ~(1<<3);
+    sei();        // enable interrupts
+  }
+  else if ( nr == 1 )
+  {
+    cli();        // disable interrupts
+    DDRB |= 1<<2;
+    PORTB &= ~(1<<2);
+    sei();        // enable interrupts
+  }
+  else
+  {
+      /* maybe force WDT */
+  }    
+}
+
+/* nr is 0 or 1 depending on the mosfet */
+void do_mosfet(uint8_t nr)
+{
+  nr &= 1;
+  switch(mosfet_data[nr].state)
+  {
+    case MOSFET_STATE_IDLE:
+      disable_mosfet(nr);
+      mosfet_data[nr].pulse_off_cnt = 0;
+      mosfet_data[nr].pulse_time_cnt = 0;
+      if ( usi_memory[MOSFET_ENABLE_0+nr] == 1 )
+      {
+	mosfet_data[nr].state = MOSFET_STATE_ON;
+	mosfet_data[nr].pulse_time_cnt = MOSFET_PULSE_TIME;
+	enable_mosfet(nr);
+      }
+      break;
+    case MOSFET_STATE_ON:
+      if ( mosfet_data[nr].pulse_time_cnt > 0 )
+	mosfet_data[nr].pulse_time_cnt--;
+    
+      if ( mosfet_data[nr].pulse_time_cnt == 0 )
+      {
+	disable_mosfet(nr);
+	usi_memory[MOSFET_ENABLE_0+nr] = 0;
+	mosfet_data[nr].state = MOSFET_STATE_OFF;
+	mosfet_data[nr].pulse_off_cnt = 255;
+      }
+      break;
+    case MOSFET_STATE_OFF:
+      disable_mosfet(nr);
+      if ( mosfet_data[nr].pulse_off_cnt > 0 )
+	mosfet_data[nr].pulse_off_cnt--;
+      if ( mosfet_data[nr].pulse_off_cnt == 0 )
+      {
+	mosfet_data[nr].state = MOSFET_STATE_IDLE;
+      }
+      break;
+    default:
+      disable_mosfet(nr);
+      mosfet_data[nr].state = MOSFET_STATE_OFF;
+      mosfet_data[nr].pulse_off_cnt = 255;
+      break;
+      
+  }
+}
 
 /*========================================================================*/
 /* ADC */ 
@@ -688,6 +827,12 @@ ISR(SIG_OVERFLOW1)
       is_capture_allowed = 1;
     }
   }
+
+  /* handle mosfet pulse */
+  
+  do_mosfet(0);
+  do_mosfet(1);
+  
 }
 
 ISR(SIG_INPUT_CAPTURE1)
@@ -815,6 +960,9 @@ void init(void)
   
   /* the two control pins for the SI9986 */
   DDRB |= 3;
+  
+  disable_mosfet(0);
+  disable_mosfet(1);
 
   /* set INA and INB of the SI9986 to zero */
   PORTB &= ~3;	/* set pwm output */
@@ -831,7 +979,7 @@ void init(void)
   
   usi_memory[IS_PRESENT] = 255;		/* unknown */
   
-  usiTwiSlaveInit();	
+  usi_twi_slave_init();	
   
   setup_timer1_interrupt();  
   
@@ -869,8 +1017,23 @@ void loop(uint8_t is_from_watchdog)
 
 ISR(SIG_WATCHDOG_TIMEOUT)
 {
+  wdt_disable();
+  
+  for(;;)
+  {
+    DDRA |= 1<<5;		/* emergency signal */
+    dm_pwm_low();
+    disable_mosfet(0);
+    PORTA |= 1<<5;
+    disable_mosfet(1);
+    wdt_reset();
+    PORTA &= ~(1<<5);
+  }
+  
+  /*
   init();
   loop(1);
+  */
   
 }
 

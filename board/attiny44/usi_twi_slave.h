@@ -65,7 +65,8 @@
 //################################################################### prototypes
 
 #define TWI_ADDRESS (15)
-void usiTwiSlaveInit(void);	// send slave address
+
+void usi_twi_slave_init(void);	// send slave address
 
 //#################################################################### variables
 
