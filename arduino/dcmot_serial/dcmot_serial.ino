@@ -127,6 +127,8 @@ void info(void)
   line("measure 1.1V ref", 5);
   line("speed with rpm control", 6);
   line("max speed with rpm control", 7);
+  line("mosfet0", 8);
+  line("mosfet1", 9);
   line("adc low pwm val", 10);
   line("measure cnt", 11);
   line("measure average", 12);
@@ -316,6 +318,7 @@ void exec(void)
 
 void loop()
 {  
+  dcmot_write(8, 1);
   
   if ( Serial.available() )
   {

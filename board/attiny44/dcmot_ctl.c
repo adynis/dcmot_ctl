@@ -12,7 +12,7 @@
   PORT A2	BEMF Measure, OUTB
   PORT A3	MOSFET 0 (GATE_SW1)
   PORT A4	SCK (ISP)/SCL
-  PORT A5	MISO (ISP)/Analog input from DIP switch (I2C address)/emergency signal: high pwm if in WDT interrupt
+  PORT A5	MISO (ISP)/Analog input (ADC5) from DIP switch (I2C address)/emergency signal: high pwm if in WDT interrupt
   PORT A6	MOSI (ISP)/SDA
   PORT A7	SYNC Input
   
@@ -112,7 +112,10 @@
 */
 #define IS_PRESENT 13
 
-
+/*
+  OUTPUT: Result from DIP switch ADC measue
+*/
+#define ADC_DIP 14
 
 
 /* 
@@ -172,8 +175,8 @@ static inline void dm_pwm_low(void)
 /* mosfet pulse */ 
 /*========================================================================*/
 
-/* duration of the mosfet pulse in timer 1 ticks (488Hz) */
-#define MOSFET_PULSE_TIME 122
+/* duration of the mosfet pulse in timer 1 ticks (488Hz): 122 = 1/4 sec, 61 = 1/8 sec */
+#define MOSFET_PULSE_TIME 61
 
 #define MOSFET_STATE_IDLE 0
 #define MOSFET_STATE_ON 1
@@ -249,7 +252,7 @@ void do_mosfet(uint8_t nr)
       disable_mosfet(nr);
       mosfet_data[nr].pulse_off_cnt = 0;
       mosfet_data[nr].pulse_time_cnt = 0;
-      if ( usi_memory[MOSFET_ENABLE_0+nr] == 1 )
+      if ( usi_memory[MOSFET_ENABLE_0+nr] == 1 && usi_memory[MOSFET_ENABLE_0+1-nr] == 0 )
       {
 	mosfet_data[nr].state = MOSFET_STATE_ON;
 	mosfet_data[nr].pulse_time_cnt = MOSFET_PULSE_TIME;
@@ -286,8 +289,93 @@ void do_mosfet(uint8_t nr)
   }
 }
 
+
 /*========================================================================*/
-/* ADC */ 
+/* DIP Switch ADC */ 
+/*========================================================================*/
+
+/* variable potentiometer ADC read */
+uint16_t get_dip_adc(void)
+{
+  uint16_t l, h;
+
+  /* turn off ADC to force long conversion */
+  ADCSRA = 0x00 | 0x07;		/* turn off ADC */  
+
+  /* use PA5/ADC5 as input pin for the ADC */
+  DDRA&= ~_BV(5);              // input pin for the ADC
+  PORTA &= ~_BV(5);		// switch off pull-up
+  
+  /* enable, but do not start ADC (ADEN, Bit 7) */
+  /* clear the interrupt indicator flag (ADIF, Bit 4) */
+  ADCSRA = 0x90 | 0x07;
+  
+  /*  Vcc as reference, ADC 5 */
+  ADMUX = 5;	
+  /* default operation */
+  ADCSRB = 0x0;
+  /* enable and start conversion, maximum prescalar */
+  ADCSRA = 0xc0|0x07;
+  /* wait for conversion to be finished (ADIF, Bit 4) */
+  while ( (ADCSRA & _BV(4)) == 0 )
+    ;
+  /* return 8 bit result */
+  
+  l = ADCL;
+  h = ADCH;
+
+  /* save some power */
+  ADCSRA = 0x00 | 0x07;		/* turn off ADC */  
+  
+  return (h<<8) | l ;
+}
+
+uint8_t get_twi_adr(void)
+{
+  uint16_t adc = get_dip_adc();
+  uint8_t adr;
+  
+  if ( adc > (1023+912)/2 )
+    adr = 0;
+  else if ( adc > (912+814)/2 )
+    adr = 1;
+  else if ( adc > (814+742)/2 )
+    adr = 2;
+  else if ( adc > (742+658)/2 )
+    adr = 3;
+  else if ( adc > (658+610)/2 )
+    adr = 4;
+  else if ( adc > (610+565)/2 )
+    adr = 5;
+  else if ( adc > (565+529)/2 )
+    adr = 6;
+  else if ( adc > (529+512)/2 )
+    adr = 7;
+  else if ( adc > (512+482)/2 )
+    adr = 8;
+  else if ( adc > (482+453)/2 )
+    adr = 9;
+  else if ( adc > (453+430)/2 )
+    adr = 10;
+  else if ( adc > (430+400)/2 )
+    adr = 11;
+  else if ( adc > (400+382)/2 )
+    adr = 12;
+  else if ( adc > (382+364)/2 )
+    adr = 13;
+  else if ( adc > (364+349)/2 )
+    adr = 14;
+  else
+    adr = 15;
+
+  usi_memory[ADC_DIP] = adc >> 2;
+  
+  return adr+64;
+}
+
+
+/*========================================================================*/
+/* BEMF ADC */ 
 /*========================================================================*/
 
 
@@ -978,6 +1066,8 @@ void init(void)
   usi_memory[SPEED_CTL_MAX] = 80;		
   
   usi_memory[IS_PRESENT] = 255;		/* unknown */
+  
+  get_twi_adr();			/* todo: result not used */
   
   usi_twi_slave_init();	
   
