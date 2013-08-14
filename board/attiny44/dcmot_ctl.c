@@ -1067,7 +1067,7 @@ void init(void)
   
   usi_memory[IS_PRESENT] = 255;		/* unknown */
   
-  get_twi_adr();			/* todo: result not used */
+  usi_twi_adr = get_twi_adr();			/* todo: result not used */
   
   usi_twi_slave_init();	
   

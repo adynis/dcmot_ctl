@@ -203,6 +203,8 @@
 
 //############################################################## local variables
 
+volatile uint8_t usi_twi_adr = 64; 					// TWI Address
+
 volatile uint8_t usi_overflow_state;
 
 volatile uint8_t usi_memory[TWI_BUFFER_SIZE];			// Buffer to write/read data received from the master

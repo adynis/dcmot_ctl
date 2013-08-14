@@ -64,7 +64,9 @@
 
 //################################################################### prototypes
 
-#define TWI_ADDRESS (15)
+extern volatile uint8_t usi_twi_adr; 					// TWI Address
+
+#define TWI_ADDRESS (usi_twi_adr)
 
 void usi_twi_slave_init(void);	// send slave address
 
