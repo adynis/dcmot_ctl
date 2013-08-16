@@ -139,10 +139,40 @@ void info(void)
   line("mosfet1", 9);
   line("adc low pwm val", 10);
   line("measure cnt", 11);
-  line("measure average", 12);
+  line("measure average (BEMF)", 12);
   line("dc motor present (1=yes)", 13);
   line("DIP ADC", 14);
-  //line("Back-EMF", 12);
+
+  Serial.print("BEMF: ");
+  I2c.read(adr, (uint8_t)16, (uint8_t)16);
+  while(I2c.available()) 
+  {
+    val = I2c.receive();  
+    Serial.print(" ");
+    Serial.print((int)val);
+  }
+  Serial.println("");
+
+
+  Serial.print("Rising Edge Abs: ");
+  I2c.read(adr, (uint8_t)32, (uint8_t)8);
+  while(I2c.available()) 
+  {
+    val = I2c.receive();  
+    Serial.print(" ");
+    Serial.print((int)val);
+  }
+  Serial.println("");
+
+  Serial.print("Rising Edge Delta: ");
+  I2c.read(adr, (uint8_t)40, (uint8_t)8);
+  while(I2c.available()) 
+  {
+    val = I2c.receive();  
+    Serial.print(" ");
+    Serial.print((int)val);
+  }
+  Serial.println("");
 
 /*  
   Serial.print("BEMF: ");
@@ -255,6 +285,7 @@ void setup() {
   // put your setup code here, to run once:
   // Wire.begin();        // join i2c bus (address optional for master)
   I2c.begin();
+  I2c.timeOut(10);      // timeout to 10ms */
   Serial.begin(9600);  // start serial for output
   Serial.println("DCMOT CTL Monitor (enable LF/CR, type 'h' for help)");
   Serial.print("TWI address=");
