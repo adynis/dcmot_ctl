@@ -290,7 +290,7 @@ void setup() {
   Serial.println("DCMOT CTL Monitor (enable LF/CR, type 'h' for help)");
   Serial.print("TWI address=");
   Serial.println(adr, DEC);
-  //analogWrite(3, 127);
+  analogWrite(3, 127);
 }
 
 void exec(void)
@@ -302,7 +302,7 @@ void exec(void)
 
 void loop()
 {  
-  dcmot_write(8, 1);
+  // dcmot_write(8, 1);
   
   if ( Serial.available() )
   {

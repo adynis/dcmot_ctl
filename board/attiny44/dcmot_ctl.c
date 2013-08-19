@@ -79,7 +79,11 @@
 */
 #define SPEED_CTL_MAX 7
 
-
+/*
+  INPUT/OUTPUT: Can be set to 1, which will turn on the MOSFET for a fixed period of time. As soon as the
+    Mosfet is turned of, the value of this variable is switched back to 0. 
+    The pulse width is defined by MOSFET_PULSE_TIME (488 Hz ticks).
+*/
 #define MOSFET_ENABLE_0 8
 #define MOSFET_ENABLE_1 9
 
@@ -176,7 +180,7 @@ static inline void dm_pwm_low(void)
 /*========================================================================*/
 
 /* duration of the mosfet pulse in timer 1 ticks (488Hz): 122 = 1/4 sec, 61 = 1/8 sec */
-#define MOSFET_PULSE_TIME 61
+#define MOSFET_PULSE_TIME 122
 
 #define MOSFET_STATE_IDLE 0
 #define MOSFET_STATE_ON 1
